@@ -7,8 +7,10 @@
 ## Публикация на GitHub Pages
 
 1. Открой [Settings → Pages](https://github.com/viDaLost/Love/settings/pages).
-2. В **Build and deployment → Source** выбери **Deploy from a branch**.
-3. Ветка: **main**, папка: **/(root)**. Нажми **Save**.
+2. В **Build and deployment → Source** выбери **GitHub Actions**.
+3. Публикация выполняется автоматически при обновлении **main**. Для ручного запуска открой **Actions → Publish GitHub Pages → Run workflow**.
+
+Процесс публикации находится в `.github/workflows/pages.yml` и загружает только `index.html`, `.nojekyll` и `assets/`.
 
 После успешной публикации GitHub покажет адрес сайта:
 **https://vidalost.github.io/Love/**
