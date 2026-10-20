@@ -1,4 +1,4 @@
-import {clamp,smooth,mix,hash,beats,TWO_PI} from "./model.js?v=eye-4";
+import {clamp,smooth,mix,hash,beats,TWO_PI} from "./model.js?v=galaxy-5";
 
 // Attachment coordinates are the actual open vessels in the 600 × 720 heart SVG.
 export const VESSEL_ROUTES=Object.freeze([
@@ -18,8 +18,8 @@ export const VESSEL_ROUTES=Object.freeze([
 ]);
 export function heartGeometry(W,H,t,emergence=1) {
   const pulse=beats(t),aspect=.82;
-  let h=H*.60,w=h*1.65*aspect;
-  if(w>W*.43){w=W*.43;h=w/(1.65*aspect);}
+  let h=H*.72,w=h*1.65*aspect;
+  if(w>W*.62){w=W*.62;h=w/(1.65*aspect);}
   w*=(1-.040*pulse)*(.76+.24*emergence);h*=1-.022*pulse;
   return {x:W*.5-w*.5,y:H*.50-h*.48,w,h,pulse};
 }

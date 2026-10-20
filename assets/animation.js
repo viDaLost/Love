@@ -1,10 +1,10 @@
 import {
   DURATION,TWO_PI,WORDS,WORD_TIMES,HEART_TIMES,clamp,smooth,mix,gauss,fract,hash,beats,ecg,loopBlend,
   blinkAmount,zoomMagnification,eyeFrame
-} from "./model.js?v=eye-4";
-import {createGalaxy} from "./galaxy.js?v=eye-4";
-import {heartGeometry,drawVessels} from "./vessels.js?v=eye-4";
-import {createSoundtrack} from "./sound.js?v=eye-4";
+} from "./model.js?v=galaxy-5";
+import {createGalaxy} from "./galaxy.js?v=galaxy-5";
+import {heartGeometry,drawVessels} from "./vessels.js?v=galaxy-5";
+import {createSoundtrack} from "./sound.js?v=galaxy-5";
 
 // Original eye and symbol pipeline, with a layered galactic sky and vascular heart.
 export function startAnimation(canvas, announcement) {
@@ -26,7 +26,7 @@ const heartSVG="<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"600\" height=\
     atlas.width=chars.length*10; atlas.height=hues.length*16*16;
     ac.font='700 13px "Courier New",monospace';ac.textBaseline='middle';ac.textAlign='center';
     for(let h=0;h<hues.length;h++) for(let s=0;s<16;s++) {
-      const v=.14+.86*(s/15), col=hues[h].map(c=>Math.round(c*v*255));
+      const v=.14+.86*(s/15), col=hues[h].map(c=>Math.round(Math.min(1,c*v*1.10)*255));
       ac.fillStyle=`rgb(${col.join(',')})`;
       for(let g=1;g<chars.length;g++) ac.fillText(chars[g],g*10+5,(h*16+s)*16+8);
     }
@@ -346,9 +346,30 @@ const heartSVG="<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"600\" height=\
     stop();state.playing=!e.matches;
     seek(e.matches?52:0);if(e.matches&&announcement)announcement.textContent="Я тебя люблю.";start();
   };
-  const onSound=()=>{const enabled=sound.toggle();if(announcement)announcement.textContent=enabled?"Звук включён.":"Звук выключен.";};
+  const soundControls=document.getElementById("sound-controls");
+  const soundButton=document.getElementById("sound-toggle");
+  const soundLabel=document.getElementById("sound-label");
+  const soundHide=document.getElementById("sound-hide");
+  const soundStatus=document.getElementById("sound-status");
+  function syncSoundControls() {
+    if(!soundButton)return;
+    soundButton.setAttribute("aria-pressed",String(sound.enabled));
+    soundButton.disabled=!sound.available;
+    if(soundLabel)soundLabel.textContent=!sound.available?"Звук недоступен":sound.enabled?"Выключи звук":"Включи звук";
+  }
+  const onSound=()=>{
+    const enabled=sound.toggle();syncSoundControls();
+    if(soundStatus)soundStatus.textContent=!sound.available?"Этот браузер не поддерживает звук.":enabled?"Звук включён.":"Звук выключен.";
+  };
+  const onHideSound=()=>{
+    if(!soundControls)return;
+    const focused=soundControls.contains(document.activeElement);
+    soundControls.hidden=true;
+    if(focused)canvas.focus({preventScroll:true});
+    if(soundStatus)soundStatus.textContent="Кнопка скрыта. Касание экрана включает и выключает звук.";
+  };
   const onKey=e=>{
-    if(e.repeat)return;
+    if(e.repeat||e.target?.closest?.("button"))return;
     if(e.code==="KeyM"){e.preventDefault();onSound();}
     if(e.code==="Space"&&!motion.matches){e.preventDefault();state.playing=!state.playing;if(state.playing)start();else stop();}
     if(e.code==="Enter"&&!motion.matches){seek(0);state.playing=true;start();}
@@ -357,10 +378,13 @@ const heartSVG="<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"600\" height=\
   function destroy() {
     disposed=true;stop();sound.destroy();clearTimeout(resizeTimer);
     canvas.removeEventListener("pointerdown",onSound);
+    soundButton?.removeEventListener("click",onSound);soundHide?.removeEventListener("click",onHideSound);
     window.removeEventListener("resize",onResize);window.removeEventListener("keydown",onKey);
     window.removeEventListener("pagehide",onHide);window.removeEventListener("pageshow",onShow);
     document.removeEventListener("visibilitychange",onVisibility);motion.removeEventListener("change",onMotion);
   }
+  soundButton?.addEventListener("click",onSound);soundHide?.addEventListener("click",onHideSound);
+  syncSoundControls();
   canvas.addEventListener("pointerdown",onSound,{passive:true});
   window.addEventListener("resize",onResize,{passive:true});window.addEventListener("keydown",onKey);
   window.addEventListener("pagehide",onHide);window.addEventListener("pageshow",onShow);

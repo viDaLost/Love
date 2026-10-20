@@ -1,4 +1,4 @@
-import {clamp,smooth,WORD_TIMES,HEART_TIMES,DURATION,hash} from "./model.js?v=eye-4";
+import {clamp,smooth,WORD_TIMES,HEART_TIMES,DURATION,hash} from "./model.js?v=galaxy-5";
 
 const noises=new WeakMap();
 function noiseBuffer(ctx) {

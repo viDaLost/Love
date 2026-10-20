@@ -5,19 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#020303">
   <meta name="color-scheme" content="dark">
-  <meta name="description" content="Болотно-зелёный глаз, полёт в Млечный Путь, красная кардиограмма, сердце с пульсирующими сосудами и «Я тебя люблю».">
+  <meta name="description" content="Болотно-зелёный глаз, полёт в Млечный Путь сверху со спиральными рукавами, красная кардиограмма, сердце с пульсирующими сосудами и «Я тебя люблю».">
   <title>Вселенная в твоих глазах</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/style.css">
+  <link rel="stylesheet" href="./assets/style.css?v=galaxy-5">
 </head>
 <body>
   <main aria-label="Вселенная в твоих глазах">
-    <canvas id="scene" role="img" aria-label="Болотно-зелёный глаз с быстрым морганием. Полёт через зрачок в Млечный Путь, красная кардиограмма и пульсирующее анатомическое сердце с сосудами. Я тебя люблю. Три пиксельных сердца. Коснись экрана, чтобы включить или выключить звук.">
+    <canvas id="scene" tabindex="-1" role="img" aria-label="Болотно-зелёный глаз с быстрым морганием. Полёт через зрачок в Млечный Путь, красная кардиограмма и пульсирующее анатомическое сердце с сосудами. Я тебя люблю. Три пиксельных сердца. Коснись экрана, чтобы включить или выключить звук.">
       Символьная анимация: глаз, Млечный Путь, красная кардиограмма, сердце с сосудами. Я тебя люблю. Три пиксельных сердца.
     </canvas>
+    <div id="sound-controls" class="sound-controls" role="group" aria-label="Управление звуком">
+      <button id="sound-toggle" class="sound-toggle" type="button" aria-pressed="false">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/>
+        </svg>
+        <span id="sound-label">Включи звук</span>
+      </button>
+      <button id="sound-hide" class="sound-hide" type="button" aria-label="Скрыть кнопку звука" title="Скрыть кнопку звука">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <span id="sound-status" class="sr-only" aria-live="polite" aria-atomic="true"></span>
     <p id="words" class="sr-only" aria-live="polite" aria-atomic="true"></p>
   </main>
   <noscript><p class="no-script">Я тебя люблю.<br><small>Для анимации включи JavaScript.</small></p></noscript>
-  <script type="module" src="./assets/animation.js?v=eye-4"></script>
+  <script type="module" src="./assets/animation.js?v=galaxy-5"></script>
 </body>
 </html>

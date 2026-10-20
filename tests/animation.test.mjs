@@ -4,7 +4,7 @@ import {
   DURATION,WORDS,WORD_TIMES,HEART_TIMES,phaseAt,blinkAmount,loopBlend,
   zoomMagnification,eyeFrame,beats,ecg
 } from "../assets/model.js";
-import {galaxySample,noise2} from "../assets/galaxy.js";
+import {galaxySample,noise2,spiralDensity} from "../assets/galaxy.js";
 import {VESSEL_ROUTES,heartGeometry,vesselCurve,curvePoint,vascularPulse} from "../assets/vessels.js";
 import {cueEvents,createSoundtrack} from "../assets/sound.js";
 
@@ -60,10 +60,10 @@ test("the galactic sky has continuous multiscale detail and bounded natural colo
   assert.ok(core[0]>empty[0]*5);assert.ok(core[0]>core[2]);
   assert.deepEqual(galaxySample(.14,.2),galaxySample(.14,.2));
 });
-test("a smaller heart keeps every incoming vessel attached throughout the heartbeat",()=>{
+test("a larger heart keeps every incoming vessel attached throughout the heartbeat",()=>{
   for(const [W,H] of [[114,149],[200,68],[96,354]])for(const t of [32,32.5,33.675,37]){
     const g=heartGeometry(W,H,t);
-    assert.ok(g.w<=W*.43);assert.ok(g.h<=H*.60);
+    assert.ok(g.w<=W*.62);assert.ok(g.h<=H*.72);
     for(const [i,r] of VESSEL_ROUTES.entries()){
       const curve=vesselCurve(r,W,H,g,i),end=curvePoint(curve,1);
       assert.ok(Math.abs(end.x-g.x-g.w*r.anchor[0])<1e-8);
@@ -101,4 +101,20 @@ test("sound creates no audio context until an explicit user gesture",()=>{
 test("the ECG and double heartbeat repeat at 72 bpm",()=>{
   assert.ok(Math.abs(beats(.1)-beats(.1+60/72))<1e-10);
   assert.ok(ecg(.365)>.95);assert.ok(ecg(.409)<-.2);
+});
+
+test("a face-on galactic disc has major and minor spiral arms around all four quadrants",()=>{
+  const radius=.60,angle=2.55*Math.log(radius+.12);
+  const value=at=>spiralDensity(Math.cos(at)*radius,Math.sin(at)*radius);
+  const arms=[0,Math.PI/2,Math.PI,Math.PI*1.5].map(offset=>value(angle+offset));
+  const between=value(angle+Math.PI/4);
+  for(const arm of arms)assert.ok(arm>between*20);
+  assert.ok(arms[0]>arms[1]);
+  assert.ok(Math.abs(arms[0]-arms[2])<1e-8);
+  assert.ok(Math.abs(arms[1]-arms[3])<1e-8);
+});
+test("the enlarged phone heart fills more of the scene while leaving room for incoming vessels",()=>{
+  const g=heartGeometry(114,149,32);
+  assert.ok(g.w>114*.55&&g.w<114*.63);
+  assert.ok(g.x>0&&g.x+g.w<114);
 });
