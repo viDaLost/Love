@@ -1,0 +1,31 @@
+:root {
+  color-scheme: dark;
+  background: #020303;
+  color: #f4b2c5;
+  font-family: Georgia, "Times New Roman", serif;
+}
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
+body { -webkit-tap-highlight-color: transparent; }
+main { width: 100%; height: 100%; height: 100dvh; overflow: hidden; }
+canvas { display: block; width: 100%; height: 100%; touch-action: pinch-zoom; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.no-script {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  text-align: center;
+  font-size: clamp(2rem, 7vw, 5rem);
+}
+.no-script small { font: 1rem system-ui, sans-serif; }

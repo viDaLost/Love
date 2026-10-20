@@ -1,0 +1,25 @@
+name: Check animation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Check JavaScript syntax
+        run: npm run check
+      - name: Check geometry, transitions, canvas and lifecycle
+        run: npm test

@@ -1,0 +1,15 @@
+{
+  "name": "love-ascii-universe",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A full-screen ASCII journey from a marsh-green eye through space to the heart.",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node scripts/check.mjs",
+    "start": "node scripts/serve.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
