@@ -2,19 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   DURATION,WORDS,WORD_TIMES,HEART_TIMES,phaseAt,blinkAmount,loopBlend,
-  zoomMagnification,eyeFrame,beats,ecg
+  zoomMagnification,eyeFrame,eyePose,eyeGeometry,returnState,returnZoom,pixelHeartScale,beats,ecg
 } from "../assets/model.js";
 import {galaxySample,noise2,spiralDensity} from "../assets/galaxy.js";
-import {VESSEL_ROUTES,heartGeometry,vesselCurve,curvePoint,vascularPulse} from "../assets/vessels.js";
-import {cueEvents,createSoundtrack} from "../assets/sound.js";
+import {VESSEL_ROUTES,heartGeometry,vesselCurve,curvePoint,vascularPulse,heartPoint,heartSlice} from "../assets/vessels.js";
+import {cueEvents,createSoundtrack,musicState,scoreGain} from "../assets/sound.js";
 
 test("the sequence starts with an eye and retains the words, three hearts and seamless return",()=>{
-  assert.deepEqual([0,6.5,11.5,20,23,28,32,40,47.4,53.5].map(phaseAt),
-    ["eye","zoom","milky-way","space-pulse","pulse","pulse-heart","heart","words","pixel-hearts","return"]);
+  assert.deepEqual([0,6.5,11.5,20,23,28,32,39.2,40.4,48.2,54,59.3].map(phaseAt),
+    ["eye","zoom","milky-way","space-pulse","pulse","pulse-heart","heart","breath","words","pixel-hearts","return-stars","return-eye"]);
   assert.deepEqual(WORDS,["Я","тебя","люблю"]);
-  assert.deepEqual(WORD_TIMES,[40,42.5,45]);
-  assert.deepEqual(HEART_TIMES,[47.4,48.7,50]);
-  assert.equal(DURATION,58);assert.equal(loopBlend(DURATION),1);assert.equal(loopBlend(0),0);
+  assert.deepEqual(WORD_TIMES,[40.4,43,45.6]);
+  assert.deepEqual(HEART_TIMES,[48.2,49.6,51]);
+  assert.equal(DURATION,66);assert.equal(loopBlend(DURATION),1);assert.equal(loopBlend(0),0);
 });
 test("the eyelid closes in 45 ms and reopens within 165 ms",()=>{
   assert.equal(blinkAmount(4),0);assert.equal(blinkAmount(4.15),1);assert.equal(blinkAmount(4.28),0);
@@ -41,7 +41,7 @@ test("the fast blink occludes the eye instead of fading it",()=>{
 });
 for(const [W,H] of [[114,149],[200,68],[96,354]]) {
   test("the eye and pupil zoom are finite and fully enter on "+W+"×"+H,()=>{
-    for(const t of [0,.1,.48,3,4.15,4.25,6.5,9,11.5]){
+    for(const t of [0,.1,.48,3,4.15,4.25,6.5,9,11.5,59.3,65.93,65.99,66]){
       const data=new Float64Array(W*H*4);
       eyeFrame(W,H,H/W*1.65,t,Math.max(0,Math.min(1,(t-6.5)/5)),data);
       for(const value of data)assert.ok(Number.isFinite(value)&&value>=0&&value<=255);
@@ -65,9 +65,9 @@ test("a larger heart keeps every incoming vessel attached throughout the heartbe
     const g=heartGeometry(W,H,t);
     assert.ok(g.w<=W*.62);assert.ok(g.h<=H*.72);
     for(const [i,r] of VESSEL_ROUTES.entries()){
-      const curve=vesselCurve(r,W,H,g,i),end=curvePoint(curve,1);
-      assert.ok(Math.abs(end.x-g.x-g.w*r.anchor[0])<1e-8);
-      assert.ok(Math.abs(end.y-g.y-g.h*r.anchor[1])<1e-8);
+      const curve=vesselCurve(r,W,H,g,i),end=curvePoint(curve,1),anchor=heartPoint(g,...r.anchor);
+      assert.ok(Math.abs(end.x-anchor.x)<1e-8);
+      assert.ok(Math.abs(end.y-anchor.y)<1e-8);
       for(let u=0;u<=1;u+=.05){const p=curvePoint(curve,u);assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y));}
     }
   }
@@ -88,7 +88,7 @@ test("audio heartbeat events follow the 72 bpm visual peaks and one chime per wo
     if(e.type==="lub")assert.ok(beats(e.at)>.99);
     if(e.type==="dub")assert.ok(beats(e.at)>.46);
   }
-  assert.ok(events.filter(e=>e.type==="lub").length>=20);
+  assert.ok(events.filter(e=>e.type==="lub").length>=18);
 });
 test("sound creates no audio context until an explicit user gesture",()=>{
   let created=0;
@@ -117,4 +117,51 @@ test("the enlarged phone heart fills more of the scene while leaving room for in
   const g=heartGeometry(114,149,32);
   assert.ok(g.w>114*.55&&g.w<114*.63);
   assert.ok(g.x>0&&g.x+g.w<114);
+});
+
+test("the final blink crosses the boundary without changing the eye image",()=>{
+  const first=pixels(114,149,0),last=pixels(114,149,DURATION);
+  assert.deepEqual([...last],[...first]);
+  assert.deepEqual(eyePose(DURATION),eyePose(0));
+  assert.ok(blinkAmount(DURATION-.05)>.99);
+  assert.ok(Math.abs(blinkAmount(DURATION-.00001)-blinkAmount(.00001))<.001);
+});
+test("returning stars target the visible reflection and complete the camera pullback",()=>{
+  for(const asp of [.164,.46,.5625,1,2.16,6.1]){
+    for(let t=54;t<=66;t+=.2){
+      const p=returnZoom(t,asp),g=eyeGeometry(114,Math.max(1,Math.round(114*asp/1.65)),asp,t,p);
+      assert.ok(g.glint.x>0&&g.glint.x<114);
+      assert.ok(g.glint.y>0&&g.glint.y<Math.max(1,Math.round(114*asp/1.65)));
+    }
+  }
+  assert.equal(returnZoom(DURATION,2.16),0);
+  assert.equal(returnState(DURATION).stars,0);
+  assert.equal(returnState(DURATION).eye,1);
+});
+test("ventricular contraction includes torsion and preserves vessel roots",()=>{
+  const peak=heartGeometry(114,149,(40+.41)/1.2);
+  assert.ok(heartSlice(peak,.7).shift>heartSlice(peak,.1).shift);
+  assert.ok(heartSlice(peak,.7).scale<heartSlice(peak,.1).scale);
+  assert.ok(Math.abs(peak.angle)>.005);
+  for(const r of VESSEL_ROUTES){
+    const p=heartPoint(peak,...r.anchor);
+    assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y));
+  }
+});
+test("all three final pixel hearts share the same gentle heartbeat",()=>{
+  const peak=(62+.41)/1.2,trough=(62+.05)/1.2;
+  for(let h=0;h<3;h++){
+    assert.ok(pixelHeartScale(peak,h)>pixelHeartScale(trough,h));
+  }
+  assert.equal(pixelHeartScale(HEART_TIMES[2]-.01,2),0);
+});
+test("the score leaves a quiet breath before the declaration and resolves on love",()=>{
+  assert.equal(scoreGain(39.8),0);assert.equal(musicState(39.8).level,0);
+  assert.equal(cueEvents(39.7,40.22).length,0);
+  assert.equal(scoreGain(40.4),1);
+  assert.ok(musicState(46.5).level>musicState(41).level);
+  assert.deepEqual(musicState(46.5).frequencies,[130.81,196,261.63,329.63,493.88]);
+  const star=cueEvents(11.5,20).filter(e=>e.type==="star");
+  assert.ok(star.some(e=>Math.abs(e.pan)>.2));
+  for(const e of cueEvents(0,DURATION))assert.ok(Math.abs(e.pan)<=.85);
 });

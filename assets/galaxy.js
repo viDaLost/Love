@@ -1,4 +1,4 @@
-import {clamp,smooth,mix,hash,gauss,TWO_PI} from "./model.js?v=galaxy-5";
+import {clamp,smooth,mix,hash,gauss,TWO_PI} from "./model.js?v=cinema-6";
 
 export function noise2(x,y) {
   const i=Math.floor(x),j=Math.floor(y),u=smooth(0,1,x-i),v=smooth(0,1,y-j);
@@ -40,10 +40,15 @@ export function galaxySample(x,y) {
 }
 export function createGalaxy(doc) {
   const field=doc.createElement("canvas"),fc=field.getContext("2d");
+  const dust=doc.createElement("canvas"),dc=dust.getContext("2d");
   let W=1,H=1;
-  const near=Array.from({length:270},(_,i)=>({
+  const near=Array.from({length:190},(_,i)=>({
     x:hash(i*8.3)*2-1,y:hash(i*9.7+83)*2-1,
     depth:.24+hash(i*3.1+4)*.76,size:hash(i*7.3+15),phase:hash(i+5)*TWO_PI
+  }));
+  const close=Array.from({length:36},(_,i)=>({
+    x:hash(i*31.7+81)*2-1,y:hash(i*17.3+63)*2-1,
+    depth:.12+hash(i*7.1)*.38,phase:hash(i+17)*TWO_PI
   }));
   function resize(w,h) {
     W=w;H=h;field.width=Math.ceil(W*1.35);field.height=Math.ceil(H*1.35);
@@ -58,6 +63,15 @@ export function createGalaxy(doc) {
       data.data[k+3]=255;
     }
     fc.putImageData(data,0,0);
+    dust.width=fw;dust.height=fh;
+    const haze=dc.createImageData(fw,fh);
+    for(let y=0;y<fh;y++)for(let x=0;x<fw;x++){
+      const u=(x-fw/2)/R,v=(y-fh/2)*1.65/R,k=(y*fw+x)*4,r=Math.hypot(u,v);
+      const density=spiralDensity(u*.96,v*.96)*(.25+.75*noise2(u*9+3,v*9-4));
+      haze.data[k]=94;haze.data[k+1]=80;haze.data[k+2]=137;
+      haze.data[k+3]=Math.round(clamp(density*.18*(1-smooth(.80,1.25,r)))*255);
+    }
+    dc.putImageData(haze,0,0);
     for(let i=0;i<14500;i++) {
       const x=hash(i*6.31)*fw,y=hash(i*11.7+4)*fh;
       const u=(x-fw/2)/R,v=(y-fh/2)*1.65/R,r=Math.hypot(u,v);
@@ -78,6 +92,11 @@ export function createGalaxy(doc) {
     ctx.rotate(.12+t*.025);ctx.scale(approach,approach);
     ctx.drawImage(field,-field.width/2,-field.height/2*1.65,field.width,field.height*1.65);
     ctx.restore();
+    ctx.save();ctx.globalAlpha=opacity*(.44+.05*Math.sin(t*.3));
+    ctx.translate(W/2+Math.sin(t*.09)*W*.012,H/2+Math.cos(t*.07)*H*.009);
+    ctx.scale(1,1/1.65);ctx.rotate(.14+t*.030);ctx.scale(approach*1.025,approach*1.025);
+    ctx.drawImage(dust,-dust.width/2,-dust.height/2*1.65,dust.width,dust.height*1.65);
+    ctx.restore();
     ctx.save();
     for(let i=0;i<near.length;i++) {
       const s=near[i],flight=1+t*.010/s.depth;
@@ -91,6 +110,20 @@ export function createGalaxy(doc) {
         ctx.globalAlpha*=.45;
         ctx.fillRect(xx-1.2,yy,2.8,.16);ctx.fillRect(xx+.2,yy-.75,.18,1.8);
       }
+    }
+    ctx.restore();
+    // A sparse nearby layer moves faster than the quiet distant sky.
+    ctx.save();
+    for(let i=0;i<close.length;i++){
+      const s=close[i],travel=1+t*.027/s.depth;
+      const x=((W/2+s.x*W*.58*travel)%W+W)%W;
+      const y=((H/2+s.y*H*.61*travel)%H+H)%H;
+      const velocity=(.045+.060*s.depth)*W;
+      ctx.globalAlpha=opacity*(.19+.16*Math.sin(t*.8+s.phase));
+      ctx.strokeStyle=i%5?"#d4dfef":"#e6c6bb";ctx.lineWidth=.30;
+      ctx.beginPath();ctx.moveTo(x,y);
+      ctx.lineTo(x-s.x*velocity*.035,y-s.y*velocity*.035/1.65);ctx.stroke();
+      ctx.fillStyle="#e4e4ef";ctx.fillRect(x,y,.7,.48);
     }
     ctx.restore();
   }

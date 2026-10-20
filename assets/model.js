@@ -1,10 +1,10 @@
 // Shared timing, easing and heartbeat geometry for the symbol animation.
-export const DURATION=58;
+export const DURATION=66;
 export const TWO_PI=Math.PI*2;
 export const WORDS=Object.freeze(["Я","тебя","люблю"]);
-export const WORD_TIMES=Object.freeze([40,42.5,45]);
-export const HEART_TIMES=Object.freeze([47.4,48.7,50]);
-export const LOOP_RETURN=53.5;
+export const WORD_TIMES=Object.freeze([40.4,43,45.6]);
+export const HEART_TIMES=Object.freeze([48.2,49.6,51]);
+export const LOOP_RETURN=54;
 export const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
 export const smooth=(a,b,v)=>{const q=clamp((v-a)/(b-a));return q*q*(3-2*q);};
 export const mix=(a,b,t)=>a+(b-a)*t;
@@ -17,15 +17,57 @@ export const beats=t=>{
 };
 export const ecg=x=>.11*gauss(x-.16,.00055)-.15*gauss(x-.32,.000065)
   +1.07*gauss(x-.365,.000075)-.32*gauss(x-.409,.0001)+.23*gauss(x-.61,.0027);
-export function blinkAmount(t) {
+export function blinkAmount(time) {
+  const t=((time%DURATION)+DURATION)%DURATION;
   let value=0;
-  for(const at of [4.1]) {
-    const age=t-at;
-    if(age<0 || age>.165)continue;
-    const b=age<.045?Math.pow(age/.045,.72):age<.060?1:1-smooth(.060,.165,age);
-    value=Math.max(value,b);
+  for(const age of [t-4.1,t>=DURATION-.1?t-(DURATION-.1):t+.1]){
+    if(age<0||age>.165)continue;
+    value=Math.max(value,age<.045?Math.pow(age/.045,.72):age<.060?1:1-smooth(.060,.165,age));
   }
   return value;
+}
+export function eyePose(time) {
+  const t=((time%DURATION)+DURATION)%DURATION,reset=smooth(64.2,DURATION,t);
+  return {
+    gazeX:mix(.035*Math.sin(t*.8)+.02*Math.sin(t*1.7),0,reset),
+    gazeY:mix(.012*Math.sin(t*.63),0,reset),
+    pupil:mix(.153+.005*Math.sin(t*.9),.153,reset),
+    blink:blinkAmount(t),reflectionTime:t*(1-reset)
+  };
+}
+export function eyeGeometry(W,H,aspect,t,zoom) {
+  const pose=eyePose(t),mag=zoomMagnification(zoom,aspect);
+  const point=(x,y)=>({
+    x:W*(.5+(x-pose.gazeX*zoom)*mag/3.2),
+    y:H*(.5+(y-(pose.gazeY-.025)*zoom)*mag/(3.2*aspect))
+  });
+  return {mag,pose,pupil:point(pose.gazeX,pose.gazeY-.025),
+    glint:point(pose.gazeX-.14,pose.gazeY-.185)};
+}
+export function irisReflection(x,y,t) {
+  const r=Math.hypot(x,y)/.31;
+  if(r>1.15)return {alpha:0,r:0,g:0,b:0};
+  const phase=Math.atan2(y,x)-2.55*Math.log(r+.12)-(.12+t*.025);
+  const arms=Math.pow(.5+.5*Math.cos(phase*2),9)
+    +.48*Math.pow(.5+.5*Math.cos(phase*2+Math.PI),15);
+  const core=gauss(r,.03),light=(.21*arms*smooth(.10,.27,r)+.74*core)*(1-smooth(.85,1.15,r));
+  return {alpha:.16+.14*smooth(4.8,6.5,t),r:light*.63+core*.50,g:light*.81+core*.34,b:light*1.10+core*.08};
+}
+export function returnState(t) {
+  return {
+    scatter:smooth(54,56.3,t),gather:smooth(56.3,59.3,t),
+    eye:smooth(57.5,60.2,t),zoom:.48*(1-smooth(59.3,64.6,t)),
+    stars:1-smooth(59.0,60.5,t)
+  };
+}
+export function returnZoom(t,aspect) {
+  const maximum=zoomMagnification(1,aspect),limit=Math.max(1,Math.min(6,aspect*6.2));
+  return Math.min(returnState(t).zoom,Math.pow(clamp((limit-1)/(maximum-1)),.4));
+}
+export function pixelHeartScale(t,index) {
+  const age=t-HEART_TIMES[index];if(age<0)return 0;
+  const pop=clamp(age/.6);
+  return (pop<1?.58+.42*smooth(0,.65,pop)+Math.sin(pop*Math.PI)*.16:1)*(1+.065*beats(t));
 }
 export function zoomMagnification(p,aspect) {
   // The desktop camera is unchanged. Tall phones continue until the pupil
@@ -40,24 +82,26 @@ export function phaseAt(t) {
   if(t<23)return "space-pulse";
   if(t<28)return "pulse";
   if(t<32)return "pulse-heart";
-  if(t<40)return "heart";
-  if(t<47.4)return "words";
+  if(t<39.2)return "heart";
+  if(t<40.4)return "breath";
+  if(t<48.2)return "words";
   if(t<LOOP_RETURN)return "pixel-hearts";
-  return "return";
+  if(t<59.3)return "return-stars";
+  return "return-eye";
 }
-export const loopBlend=t=>smooth(LOOP_RETURN,DURATION,t);
+export const loopBlend=t=>smooth(LOOP_RETURN,56.3,t);
 
 // Almond-shaped lids, a gentle lifted outer corner and olive/hazel iris from the references.
 export function eyeFrame(W,H,asp,t,zoom,eyePixels) {
-    const blink = blinkAmount(t);
-    const gazeX=.035*Math.sin(t*.8)+.02*Math.sin(t*1.7),gazeY=.012*Math.sin(t*.63);
+    const pose=eyePose(t),blink=pose.blink;
+    const gazeX=pose.gazeX,gazeY=pose.gazeY;
     const magnify=zoomMagnification(zoom,asp);
     for(let j=0;j<H;j++) for(let i=0;i<W;i++) {
       const k=(j*W+i)*4;
       const X=(i/W-.5)*3.2/magnify+gazeX*zoom,Y=(j/H-.5)*3.2*asp/magnify+(gazeY-.025)*zoom;
       const shape=Math.pow(Math.max(0,1-Math.pow(Math.abs(X)/1.31,1.85)),.76);
       const tilt=-.045*X;
-      const open=.14+.86*smooth(0,.48,t),seam=.16*shape*open+tilt;
+      const open=1,seam=.16*shape*open+tilt;
       const upper=mix(-.335*shape*open+tilt,seam,blink),lower=mix(.255*shape*open+tilt,seam,blink);
       const upperD=Y-upper,lowerD=lower-Y;
       const inEye=Math.abs(X)<1.31 && upperD>0 && lowerD>0;
@@ -79,10 +123,12 @@ export function eyeFrame(W,H,asp,t,zoom,eyePixels) {
           const rim=smooth(.91,1,u),innerGold=gauss(u-.37,.015),collarette=.12*gauss(u-.54,.003)*(.7+.3*Math.sin(angle*36));
           const value=(radial+collarette)*lidShadow*(1-rim*.8);
           r=value*(.82+innerGold*.30);g=value*(.89+innerGold*.13);b=value*(.43-innerGold*.14);
-          const pupil=.153+.005*Math.sin(t*.9);
+          const pupil=pose.pupil;
           const mask=smooth(pupil-.009,pupil+.008,rr);
           r*=mask;g*=mask;b*=mask;
           if(rr<pupil){r=.002;g=.008;b=.006;}
+          const galaxy=irisReflection(x,y,pose.reflectionTime);
+          r+=galaxy.r*galaxy.alpha;g+=galaxy.g*galaxy.alpha;b+=galaxy.b*galaxy.alpha;
         }
         const reflection=.87*Math.exp(-Math.pow((x+.14)/.074,6)-Math.pow((y+.16)/.049,6));
         const reflection2=.40*gauss(x+.047,.0005)*gauss(y+.17,.001);

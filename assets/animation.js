@@ -1,10 +1,10 @@
 import {
   DURATION,TWO_PI,WORDS,WORD_TIMES,HEART_TIMES,clamp,smooth,mix,gauss,fract,hash,beats,ecg,loopBlend,
-  blinkAmount,zoomMagnification,eyeFrame
-} from "./model.js?v=galaxy-5";
-import {createGalaxy} from "./galaxy.js?v=galaxy-5";
-import {heartGeometry,drawVessels} from "./vessels.js?v=galaxy-5";
-import {createSoundtrack} from "./sound.js?v=galaxy-5";
+  blinkAmount,zoomMagnification,eyeFrame,eyePose,eyeGeometry,returnState,returnZoom,pixelHeartScale,LOOP_RETURN
+} from "./model.js?v=cinema-6";
+import {createGalaxy} from "./galaxy.js?v=cinema-6";
+import {heartGeometry,drawVessels,heartPoint,heartSlice} from "./vessels.js?v=cinema-6";
+import {createSoundtrack} from "./sound.js?v=cinema-6";
 
 // Original eye and symbol pipeline, with a layered galactic sky and vascular heart.
 export function startAnimation(canvas, announcement) {
@@ -19,7 +19,8 @@ export function startAnimation(canvas, announcement) {
   const motion=window.matchMedia("(prefers-reduced-motion: reduce)");
   const state={time:motion.matches?52:0,playing:!motion.matches,speed:1,cols:170,rows:92,w:1000,h:550,frames:0};
   let imageData,eyePixels,lastFrame=0,lastTick=0,slowFrames=0,resizeTimer,raf=0,disposed=false,announced=-1;
-  let wordLayers=[],wordPoints=[];
+  let wordLayers=[],wordPoints=[],returnPoints=[];
+  const heartBitmap=["01100110","11111111","11111111","11111111","01111110","00111100","00011000"];
 
 const heartSVG="<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"600\" height=\"720\" viewBox=\"0 0 600 720\">\n  <defs>\n    <radialGradient id=\"lv\" cx=\"35%\" cy=\"30%\" r=\"80%\"><stop stop-color=\"#f28f82\"/><stop offset=\".27\" stop-color=\"#cb4e50\"/><stop offset=\".62\" stop-color=\"#902a40\"/><stop offset=\"1\" stop-color=\"#260f23\"/></radialGradient>\n    <radialGradient id=\"rv\" cx=\"37%\" cy=\"30%\" r=\"80%\"><stop stop-color=\"#e17d70\"/><stop offset=\".4\" stop-color=\"#ae3f50\"/><stop offset=\"1\" stop-color=\"#49142d\"/></radialGradient>\n    <radialGradient id=\"atrium\" cx=\"25%\" cy=\"25%\" r=\"85%\"><stop stop-color=\"#c66f70\"/><stop offset=\".5\" stop-color=\"#8e3b55\"/><stop offset=\"1\" stop-color=\"#38152e\"/></radialGradient>\n    <linearGradient id=\"artery\"><stop stop-color=\"#69263e\"/><stop offset=\".26\" stop-color=\"#e89383\"/><stop offset=\".55\" stop-color=\"#e07572\"/><stop offset=\"1\" stop-color=\"#751f35\"/></linearGradient>\n    <linearGradient id=\"vein\"><stop stop-color=\"#193c51\"/><stop offset=\".27\" stop-color=\"#67a7ba\"/><stop offset=\".55\" stop-color=\"#487b99\"/><stop offset=\"1\" stop-color=\"#1e304e\"/></linearGradient>\n    <linearGradient id=\"trunk\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\".3\"><stop stop-color=\"#2c455f\"/><stop offset=\".35\" stop-color=\"#7aaebc\"/><stop offset=\".7\" stop-color=\"#406c8c\"/><stop offset=\"1\" stop-color=\"#152e4b\"/></linearGradient>\n    <linearGradient id=\"coronary\"><stop stop-color=\"#8e253d\"/><stop offset=\".35\" stop-color=\"#efb28d\"/><stop offset=\".6\" stop-color=\"#cb745f\"/><stop offset=\"1\" stop-color=\"#5a172a\"/></linearGradient>\n    <filter id=\"blur\"><feGaussianBlur stdDeviation=\"2\"/></filter>\n  </defs>\n  <g stroke-linejoin=\"round\" stroke-linecap=\"round\">\n    <!-- Posterior pulmonary veins and the descending aorta. -->\n    <path d=\"M350 244Q446 194 501 210L510 241Q449 228 378 279Z\" fill=\"url(#artery)\" stroke=\"#421c30\" stroke-width=\"3\"/>\n    <path d=\"M378 283Q453 250 513 273L509 307Q458 284 397 322Z\" fill=\"url(#artery)\" stroke=\"#421c30\" stroke-width=\"3\"/>\n    <ellipse cx=\"504\" cy=\"226\" rx=\"9\" ry=\"15\" fill=\"#581d31\" transform=\"rotate(-15 504 226)\"/>\n    <ellipse cx=\"511\" cy=\"290\" rx=\"9\" ry=\"15\" fill=\"#581d31\"/>\n    <path d=\"M335 168Q410 186 396 323L362 371 330 308Z\" fill=\"#742b44\"/>\n    <!-- Superior and inferior vena cava into the right atrium. -->\n    <path d=\"M157 286Q159 206 135 124L181 110Q210 186 210 281Z\" fill=\"url(#vein)\" stroke=\"#182b3c\" stroke-width=\"3\"/>\n    <ellipse cx=\"157\" cy=\"117\" rx=\"24\" ry=\"10\" transform=\"rotate(-14 157 117)\" fill=\"#131f31\" stroke=\"#74a5b2\" stroke-width=\"4\"/>\n    <path d=\"M153 411L158 487 204 483 205 399Z\" fill=\"url(#vein)\"/>\n    <!-- Aortic arch and its three upper branches. -->\n    <path d=\"M265 247C238 214 231 145 253 106C277 61 341 73 364 113C380 140 381 179 370 218L337 213C350 175 347 140 331 123C318 108 298 109 289 125C276 148 285 188 300 219Z\" fill=\"url(#artery)\" stroke=\"#62243a\" stroke-width=\"4\"/>\n    <path d=\"M273 103L258 50Q261 40 278 43L299 91Z\" fill=\"url(#artery)\" stroke=\"#6e2b3e\" stroke-width=\"3\"/>\n    <path d=\"M307 86L305 30Q315 22 329 30L332 91Z\" fill=\"url(#artery)\" stroke=\"#6e2b3e\" stroke-width=\"3\"/>\n    <path d=\"M340 105L353 50Q365 44 377 54L366 127Z\" fill=\"url(#artery)\" stroke=\"#6e2b3e\" stroke-width=\"3\"/>\n    <ellipse cx=\"268\" cy=\"48\" rx=\"11\" ry=\"5\" fill=\"#55172d\" stroke=\"#dc9281\" stroke-width=\"2\" transform=\"rotate(-10 268 48)\"/>\n    <ellipse cx=\"317\" cy=\"28\" rx=\"11\" ry=\"4\" fill=\"#55172d\" stroke=\"#dc9281\" stroke-width=\"2\"/>\n    <ellipse cx=\"365\" cy=\"51\" rx=\"11\" ry=\"5\" fill=\"#55172d\" stroke=\"#dc9281\" stroke-width=\"2\" transform=\"rotate(12 365 51)\"/>\n    <path d=\"M266 167Q259 123 278 107\" fill=\"none\" stroke=\"#ffb09a\" stroke-opacity=\".55\" stroke-width=\"6\"/>\n    <!-- Atria. -->\n    <path d=\"M195 242C155 231 115 266 112 314C106 358 115 408 153 436C170 448 199 432 215 409L244 290Z\" fill=\"url(#atrium)\" stroke=\"#4b2237\" stroke-width=\"3\"/>\n    <path d=\"M338 226C388 201 432 232 444 271C450 307 432 340 407 355L324 289Z\" fill=\"url(#atrium)\" stroke=\"#492138\" stroke-width=\"3\"/>\n    <!-- Ventricular silhouette: broad base, tapered left-ventricular apex. -->\n    <path d=\"M182 307C209 270 259 257 306 269C335 249 388 261 420 292C465 334 478 407 455 474C432 544 381 594 342 637C327 654 306 652 290 638C249 602 189 565 158 510C128 457 131 368 182 307Z\" fill=\"url(#lv)\" stroke=\"#511d30\" stroke-width=\"4\"/>\n    <path d=\"M185 307C218 283 271 280 305 295C277 337 285 382 305 430C319 471 315 532 339 626C278 591 217 553 181 501C146 452 141 360 185 307Z\" fill=\"url(#rv)\"/>\n    <path d=\"M324 293C287 339 306 392 325 433C342 482 325 547 343 622\" fill=\"none\" stroke=\"#561c32\" stroke-width=\"14\" opacity=\".7\"/>\n    <path d=\"M348 312C386 289 429 331 438 382C450 427 428 487 402 518\" fill=\"none\" stroke=\"#faaa8b\" stroke-width=\"16\" opacity=\".18\" filter=\"url(#blur)\"/>\n    <path d=\"M179 364C159 407 170 459 192 488\" fill=\"none\" stroke=\"#f6a18c\" stroke-width=\"14\" opacity=\".15\" filter=\"url(#blur)\"/>\n    <!-- Pulmonary trunk lies in front of the ascending aorta and bifurcates. -->\n    <path d=\"M256 305C253 277 261 235 291 204C320 179 368 174 420 172L431 211C391 214 349 215 330 235C314 255 314 279 316 300Z\" fill=\"url(#trunk)\" stroke=\"#233d53\" stroke-width=\"3\"/>\n    <path d=\"M299 210Q251 182 197 196L198 231Q251 220 279 248Z\" fill=\"url(#vein)\" stroke=\"#2b4358\" stroke-width=\"3\"/>\n    <ellipse cx=\"425\" cy=\"191\" rx=\"10\" ry=\"20\" transform=\"rotate(-16 425 191)\" fill=\"#182d44\" stroke=\"#82aab7\" stroke-width=\"3\"/>\n    <path d=\"M285 280C282 251 304 217 334 207Q365 193 398 194\" fill=\"none\" stroke=\"#a1c7c9\" stroke-opacity=\".45\" stroke-width=\"6\"/>\n    <!-- Auricles wrap the roots of the great vessels. -->\n    <path d=\"M196 254C203 230 229 224 246 239L259 271Q242 289 222 288L192 279Z\" fill=\"url(#atrium)\" stroke=\"#60283c\" stroke-width=\"3\"/>\n    <path d=\"M374 244Q418 239 427 270L403 293Q374 284 355 264Z\" fill=\"url(#atrium)\" stroke=\"#60283c\" stroke-width=\"3\"/>\n    <path d=\"M207 252L219 264 226 246 235 269 242 250M383 254L388 273 399 257 407 276\" stroke=\"#df9a8b\" stroke-opacity=\".25\" stroke-width=\"3\" fill=\"none\"/>\n    <!-- Coronary arteries and their branches along the ventricular surface. -->\n    <g fill=\"none\" stroke=\"#491929\" stroke-width=\"12\" opacity=\".8\"><path d=\"M324 294C302 332 306 377 321 418C341 470 325 529 343 613\"/><path d=\"M301 303C262 310 218 305 184 330C152 354 151 397 160 427\"/></g>\n    <g fill=\"none\" stroke=\"url(#coronary)\">\n      <path d=\"M324 290C303 330 305 377 321 418C340 470 327 529 343 616\" stroke-width=\"8\"/>\n      <path d=\"M301 301C264 309 220 304 185 330C153 355 150 397 160 427\" stroke-width=\"7\"/>\n      <path d=\"M311 357C345 352 369 365 393 390L426 416M317 395C356 395 372 418 382 444L406 461M330 451C356 455 371 482 375 511M334 507Q356 530 359 557\" stroke-width=\"5\"/>\n      <path d=\"M309 369C282 378 254 396 245 423L229 452M323 428C296 441 286 467 272 485L252 498M332 492Q310 515 302 539M192 327C203 350 213 360 211 384M166 364Q184 390 183 414L198 443M161 412Q177 438 169 462\" stroke-width=\"4\"/>\n      <path d=\"M391 389L401 366 409 359M381 444L367 454M245 422L263 432 269 446M279 476L292 484M211 383L230 396M302 540L319 550M353 528L367 533M188 421L210 426\" stroke-width=\"2.5\"/>\n    </g>\n    <g fill=\"none\" stroke=\"#638495\" opacity=\".65\"><path d=\"M333 315C321 351 327 389 340 420C358 460 345 512 358 576\" stroke-width=\"4\"/><path d=\"M338 383Q371 380 404 408M349 454Q382 469 389 490\" stroke-width=\"3\"/></g>\n    <g fill=\"none\" stroke=\"#f7b39b\" opacity=\".12\" stroke-width=\"2\"><path d=\"M351 365Q396 398 415 445M351 381Q400 427 403 473M355 416Q390 451 384 493M350 483Q370 512 369 538M203 413Q225 469 273 502M195 436Q217 492 282 529M213 489Q245 533 285 550M222 520Q256 557 297 575\"/></g>\n  </g></svg>";
   function makeAtlas() {
@@ -61,8 +62,8 @@ const heartSVG="<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"600\" height=\
   }
   function drawLashes(t,zoom) {
     const W=state.cols,H=state.rows,asp=state.h/state.w,mag=zoomMagnification(zoom,asp);
-    const gx=.035*Math.sin(t*.8)+.02*Math.sin(t*1.7),gy=.012*Math.sin(t*.63);
-    const open=.14+.86*smooth(0,.48,t),blink=blinkAmount(t);
+    const pose=eyePose(t),gx=pose.gazeX,gy=pose.gazeY;
+    const open=1,blink=pose.blink;
     const px=X=>W*((X-gx*zoom)*mag/3.2+.5);
     const py=Y=>H*((Y-(gy-.025)*zoom)*mag/(3.2*asp)+.5);
     rc.save();rc.strokeStyle="#100c0a";rc.lineWidth=Math.max(.24,W/3.2*mag*.010);
@@ -136,6 +137,30 @@ const heartSVG="<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"600\" height=\
       }
       wordLayers.push(layer);wordPoints.push(points);
     }
+    prepareReturnStars();
+  }
+  function pixelHeartLayout(t,index) {
+    const W=canvas.width,H=canvas.height,block=Math.max(2,Math.floor(Math.min(W/76,H/95)));
+    const cell=Math.max(1,block*pixelHeartScale(t,index));
+    return {cell,block,x:W*[.33,.5,.67][index]-cell*4,y:H*.84-cell*3.5};
+  }
+  function prepareReturnStars() {
+    const W=state.cols,H=state.rows;
+    returnPoints=[];
+    function add(x,y,alpha=1) {
+      const n=returnPoints.length;
+      returnPoints.push({x,y,alpha,angle:hash(n*4.3)*TWO_PI,spread:.04+hash(n*8.7)*.23,phase:hash(n*2.1+7)});
+    }
+    for(const points of wordPoints){
+      const stride=Math.max(1,Math.floor(points.length/180));
+      for(let i=0;i<points.length;i+=stride)add(points[i].x,points[i].y,points[i].a);
+    }
+    for(let h=0;h<3;h++){
+      const q=pixelHeartLayout(LOOP_RETURN,h);
+      for(let row=0;row<heartBitmap.length;row++)for(let col=0;col<8;col++){
+        if(heartBitmap[row][col]==="1")add((q.x+(col+.5)*q.cell)/canvas.width*W,(q.y+(row+.5)*q.cell)/canvas.height*H);
+      }
+    }
   }
   function drawWords(t) {
     const W=state.cols,H=state.rows;
@@ -143,6 +168,13 @@ const heartSVG="<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"600\" height=\
       const age=t-WORD_TIMES[word];if(age<0)continue;
       if(word>announced&&announcement){announcement.textContent=WORDS.slice(0,word+1).join(" ");announced=word;}
       const cx=W*.5,cy=H*[.30,.49,.68][word],p=smooth(.1,.95,age);
+      if(age<.55){
+        const flash=Math.exp(-Math.pow((age-.08)/.13,2))*.30;
+        rc.save();rc.globalAlpha=flash;rc.translate(cx,cy);rc.scale(1,1/1.65);
+        const glow=rc.createRadialGradient(0,0,0,0,0,W*.11);
+        glow.addColorStop(0,"#ffe9dd");glow.addColorStop(.2,"#f1a1bf");glow.addColorStop(1,"#f1a1bf00");
+        rc.fillStyle=glow;rc.fillRect(-W*.12,-W*.12,W*.24,W*.24);rc.restore();
+      }
       rc.save();
       if(p>=1)rc.drawImage(wordLayers[word],0,0);
       else {
@@ -201,21 +233,75 @@ const heartSVG="<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"600\" height=\
     const aura=rc.createRadialGradient(W/2,H*.51,0,W/2,H*.51,W*.28);
     aura.addColorStop(0,"rgba(145,25,57,"+(.08+.10*g.pulse)+")");
     aura.addColorStop(1,"#00000000");rc.fillStyle=aura;rc.fillRect(0,0,W,H);
-    if(heart.complete&&heart.naturalWidth)rc.drawImage(heart,g.x,g.y,g.w,g.h);
+    rc.save();
+    rc.translate(g.x+g.w/2,g.y+g.h/2);rc.scale(1,1/1.65);rc.rotate(g.angle);rc.scale(1,1.65);
+    rc.translate(-g.x-g.w/2,-g.y-g.h/2);
+    if(heart.complete&&heart.naturalWidth) {
+      // A shallow strip mesh gives the ventricles a separate contraction.
+      const slices=24;
+      for(let i=0;i<slices;i++){
+        const v=(i+.5)/slices,shape=heartSlice(g,v);
+        const x=g.x+g.w/2-g.w*shape.scale/2+shape.shift,y=g.y+g.h*i/slices;
+        rc.drawImage(heart,0,720*i/slices,600,720/slices,x,y,g.w*shape.scale,g.h/slices+.18);
+      }
+    }
+    rc.restore();
+    const light=heartPoint(g,.47,.58),r=g.w*.19;
+    const sheen=rc.createRadialGradient(light.x,light.y,0,light.x,light.y,r);
+    sheen.addColorStop(0,"rgba(255,170,150,"+(.025+.045*g.pulse)+")");sheen.addColorStop(1,"#ffaaaa00");
+    rc.fillStyle=sheen;rc.fillRect(light.x-r,light.y-r,r*2,r*2);
     rc.restore();
   }
 
-  function drawMorph(from,to,p,t) {
-    const W=state.cols,H=state.rows;
-    // Dimming sources preserve their shape while points gather along the next silhouette.
-    from(1-smooth(.05,.73,p));to(smooth(.28,.95,p));
-    rc.save();rc.globalAlpha=Math.sin(p*Math.PI)*.65;
-    for(let i=0;i<particles.length;i++) {
-      const q=particles[i],f=smooth(0,1,clamp(p*1.3-q.phase*.3));
-      const sx=q.x*W,sy=q.y*H;
-      const ex=q.x*W,ey=H*.52-ecg(fract(q.x*2.35))*H*.235;
-      const x=mix(sx,ex,f),y=mix(sy,ey,f);
-      rc.fillStyle=i%4?'#e88499':'#ffe0da';rc.fillRect(x,y,.6,.48);
+  function drawGalaxyToPulse(t) {
+    const W=state.cols,H=state.rows,p=clamp((t-20)/3),ease=smooth(0,1,p);
+    drawSpace(12+t-20);
+    bc.clearRect(0,0,W,H);bc.drawImage(raw,0,0);
+    rc.fillStyle="#020605";rc.fillRect(0,0,W,H);
+    const stretch=1+smooth(0,.80,p)*.65,squash=1-smooth(0,.76,p)*.995;
+    rc.save();rc.globalAlpha=1-smooth(.62,.97,p);
+    rc.drawImage(base,(W-W*stretch)/2,H*.52-H*squash*.52,W*stretch,H*squash);rc.restore();
+    drawECG(t,smooth(.40,.98,p));
+    rc.save();rc.globalAlpha=Math.sin(p*Math.PI)*.70;
+    const length=W*smooth(.05,.78,p),line=rc.createLinearGradient(W/2-length/2,0,W/2+length/2+.001,0);
+    line.addColorStop(0,"#e76f89");line.addColorStop(.5,"#ffe3ba");line.addColorStop(1,"#ef7d92");
+    rc.strokeStyle=line;rc.lineWidth=.65;
+    rc.beginPath();rc.moveTo(W/2-length/2,H*.52);rc.lineTo(W/2+length/2,H*.52);rc.stroke();
+    for(let i=0;i<particles.length;i++){
+      const q=particles[i],r=.12+q.x*.82,angle=2.55*Math.log(r+.12)+(i%4)*Math.PI/2+.12+(12+t-20)*.025;
+      const radius=Math.min(W,H*1.65)*.39*r;
+      const sx=W/2+Math.cos(angle)*radius,sy=H/2+Math.sin(angle)*radius/1.65;
+      const f=smooth(0,1,clamp(ease*1.18-q.phase*.18));
+      const ex=q.y*W,ey=H*.52-ecg(fract(q.y*2.35))*H*.235;
+      rc.fillStyle=i%4?"#f0a1b0":"#ffe0ba";rc.fillRect(mix(sx,ex,f),mix(sy,ey,f),.55,.40);
+    }
+    rc.restore();
+  }
+
+  function drawReturn(t) {
+    const W=state.cols,H=state.rows,s=returnState(t),zoom=returnZoom(t,state.h/state.w);
+    if(s.eye>0){
+      drawEye(t,zoom);
+      rc.save();rc.globalAlpha=1-s.eye;rc.fillStyle="#020605";rc.fillRect(0,0,W,H);rc.restore();
+    }
+    if(s.scatter<1){rc.save();rc.globalAlpha=Math.pow(1-s.scatter,1.5);drawWords(t);rc.restore();}
+    const target=eyeGeometry(W,H,state.h/state.w,t,zoom).glint;
+    rc.save();
+    for(let i=0;i<returnPoints.length;i++){
+      const q=returnPoints[i],g=smooth(0,1,clamp(s.gather*1.16-q.phase*.16));
+      const angle=q.angle+s.scatter*.50;
+      const sx=q.x+Math.cos(angle)*W*q.spread*s.scatter;
+      const sy=q.y+Math.sin(angle)*W*q.spread*s.scatter/1.65;
+      const curl=Math.sin(g*Math.PI)*(1-g)*W*.022;
+      const x=mix(sx,target.x,g)+Math.sin(angle+g*5)*curl;
+      const y=mix(sy,target.y,g)+Math.cos(angle+g*5)*curl/1.65;
+      rc.globalAlpha=q.alpha*smooth(0,.18,s.scatter)*s.stars*(.58+.32*Math.sin(t*.7+q.phase*TWO_PI));
+      rc.fillStyle=i%7?"#e4dded":"#ffe2b8";
+      rc.fillRect(x,y,i%9?.48:.85,i%9?.34:.53);
+    }
+    if(s.gather>.6&&s.stars>0){
+      rc.globalAlpha=smooth(.6,.96,s.gather)*s.stars*.35;
+      rc.fillStyle="#fff2db";rc.fillRect(target.x-.8,target.y-.5,1.6,1);
     }
     rc.restore();
   }
@@ -229,8 +315,7 @@ const heartSVG="<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"600\" height=\
       bc.clearRect(0,0,W,H);bc.drawImage(raw,0,0);
       rc.fillStyle="#020605";rc.fillRect(0,0,W,H);drawSpace((t-6.5)*.7);
       const saved=rc.getImageData(0,0,W,H),space=saved.data,eye=bc.getImageData(0,0,W,H).data;
-      const asp=state.h/state.w,mag=zoomMagnification(p,asp);
-      const gx=.035*Math.sin(t*.8)+.02*Math.sin(t*1.7),gy=.012*Math.sin(t*.63);
+      const asp=state.h/state.w,mag=zoomMagnification(p,asp),pose=eyePose(t),gx=pose.gazeX,gy=pose.gazeY;
       for(let j=0;j<H;j++)for(let i=0;i<W;i++) {
         const k=(j*W+i)*4,x=(i/W-.5)*3.2,y=(j/H-.5)*3.2*asp;
         const d=Math.hypot(x-gx*(1-p)*mag,y-(gy-.025)*(1-p)*mag);
@@ -239,45 +324,44 @@ const heartSVG="<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"600\" height=\
       }
       rc.putImageData(saved,0,0);
     } else if(t<20)drawSpace(3.5+t-11.5);
-    else if(t<23)drawMorph(alpha=>drawSpace(12+t-20,alpha),alpha=>drawECG(t,alpha),(t-20)/3,t);
+    else if(t<23)drawGalaxyToPulse(t);
     else if(t<28)drawECG(t);
     else if(t<32) {
-      const p=smooth(28,32,t);
+      const birth=(34+.41)/1.2,p=smooth(birth,32,t);
       drawECG(t,1-smooth(.05,.64,p));drawHeart(t,smooth(.12,.95,p),p);
-      rc.save();rc.globalAlpha=Math.sin(p*Math.PI)*.4;
-      rc.strokeStyle="#f5a6b6";rc.lineWidth=.6;rc.beginPath();
-      for(let i=0;i<W;i++) {
-        const u=i/W,x=W*.5+(u-.5)*W*(1-p*.55);
-        const y=H*.5-ecg(fract(u*2.35))*H*.2*(1-p)+Math.sin(u*TWO_PI)*H*.25*p;
-        i?rc.lineTo(x,y):rc.moveTo(x,y);
+      const age=t-birth;
+      if(age>0&&age<1.1) {
+        const x=W*1.365/2.35,y=H*.52-ecg(.365)*H*.235,r=Math.min(W,H*1.65)*.45*smooth(0,1.1,age);
+        rc.save();rc.globalAlpha=(1-age/1.1)*.65;rc.strokeStyle="#ffb5bd";rc.lineWidth=.5;
+        rc.beginPath();rc.ellipse(x,y,r,r/1.65,0,0,TWO_PI);rc.stroke();rc.restore();
       }
-      rc.stroke();rc.restore();
-    } else if(t<40)drawHeart(t);
-    else {
-      drawHeart(t,1-smooth(40,41.3,t));drawWords(t);
-      const back=loopBlend(t);
-      if(back>0) {
-        bc.clearRect(0,0,W,H);bc.drawImage(raw,0,0);drawEye(0,0);
-        rc.save();rc.globalAlpha=1-back;rc.drawImage(base,0,0);rc.restore();
-      }
+    } else if(t<39.2)drawHeart(t);
+    else if(t<40.4){
+      drawHeart(t,1-smooth(39.2,40.4,t));
+      const p=smooth(39.2,40.4,t),x=W/2,y=mix(H*.50,H*.30,p),r=W*.025;
+      rc.save();rc.globalAlpha=.18+.22*p;
+      const light=rc.createRadialGradient(x,y,0,x,y,r);
+      light.addColorStop(0,"#ffe0d0");light.addColorStop(1,"#f4aac200");
+      rc.fillStyle=light;rc.fillRect(x-r,y-r,r*2,r*2);rc.restore();
     }
+    else if(t<LOOP_RETURN)drawWords(t);
+    else drawReturn(t);
   }
   function drawPixelHearts(t) {
     const fade=1-loopBlend(t);if(fade<=0)return;
     const W=canvas.width,H=canvas.height;
-    const bitmap=["01100110","11111111","11111111","11111111","01111110","00111100","00011000"];
+    const bitmap=heartBitmap;
     const block=Math.max(2,Math.floor(Math.min(W/76,H/95)));
     ctx.save();ctx.imageSmoothingEnabled=false;
     for(let h=0;h<3;h++) {
       const age=t-HEART_TIMES[h];if(age<0)continue;
-      const pop=clamp(age/.6),scale=pop<1?.58+.42*smooth(0,.65,pop)+Math.sin(pop*Math.PI)*.16:1;
-      const cell=Math.max(1,Math.round(block*scale));
-      const x=Math.round(W*[.33,.5,.67][h]-cell*4),y=Math.round(H*.84-cell*3.5);
+      const q=pixelHeartLayout(t,h),cell=q.cell,x=q.x,y=q.y;
       ctx.globalAlpha=fade*smooth(0,.16,age);
       for(let row=0;row<bitmap.length;row++)for(let col=0;col<8;col++) {
         if(bitmap[row][col]!=="1")continue;
         ctx.fillStyle=row<2&&col<4?"#f7a3b9":row>4?"#ad355e":"#e96c96";
-        ctx.fillRect(x+col*cell,y+row*cell,cell,cell);
+        const px=Math.round(x+col*cell),py=Math.round(y+row*cell);
+        ctx.fillRect(px,py,Math.max(1,Math.round(x+(col+1)*cell)-px),Math.max(1,Math.round(y+(row+1)*cell)-py));
       }
       if(age<1.5)for(let i=0;i<18;i++) {
         const angle=i/18*TWO_PI+hash(h+91),r=(1-Math.exp(-age*3))*block*(6+hash(i+h*33)*4);
@@ -330,7 +414,7 @@ const heartSVG="<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"600\" height=\
     if(!lastTick)lastTick=now;
     const dt=Math.min(.1,Math.max(0,(now-lastTick)/1000));lastTick=now;
     state.time+=dt*state.speed;
-    if(state.time>=DURATION){state.time%=DURATION;announced=-1;if(announcement)announcement.textContent="";if(state.cols!==state.targetCols)resetGrid(state.targetCols);}
+    if(state.time>=DURATION){state.time%=DURATION;announced=-1;if(announcement)announcement.textContent="";}
     sound.update(state.time,true);
     if(now-lastFrame>=1000/30) {
       const began=performance.now();render(state.time);const duration=performance.now()-began;

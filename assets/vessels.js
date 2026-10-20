@@ -1,4 +1,4 @@
-import {clamp,smooth,mix,hash,beats,TWO_PI} from "./model.js?v=galaxy-5";
+import {clamp,smooth,mix,hash,beats,TWO_PI} from "./model.js?v=cinema-6";
 
 // Attachment coordinates are the actual open vessels in the 600 × 720 heart SVG.
 export const VESSEL_ROUTES=Object.freeze([
@@ -21,15 +21,28 @@ export function heartGeometry(W,H,t,emergence=1) {
   let h=H*.72,w=h*1.65*aspect;
   if(w>W*.62){w=W*.62;h=w/(1.65*aspect);}
   w*=(1-.040*pulse)*(.76+.24*emergence);h*=1-.022*pulse;
-  return {x:W*.5-w*.5,y:H*.50-h*.48,w,h,pulse};
+  return {x:W*.5-w*.5,y:H*.50-h*.48,w,h,pulse,
+    angle:-.018*pulse+.004*Math.sin(t*.7),torsion:.027*pulse};
+}
+export function heartSlice(heart,v) {
+  const lower=smooth(.28,.86,v);
+  return {scale:1-.021*heart.pulse*lower,
+    shift:Math.sin(v*Math.PI)*heart.w*heart.torsion*(v-.18)};
+}
+export function heartPoint(heart,u,v) {
+  const slice=heartSlice(heart,v),x=(u-.5)*heart.w*slice.scale+slice.shift,y=(v-.5)*heart.h;
+  const c=Math.cos(heart.angle),s=Math.sin(heart.angle);
+  return {x:heart.x+heart.w/2+x*c-y*1.65*s,
+    y:heart.y+heart.h/2+x*s/1.65+y*c};
 }
 export function vesselCurve(route,W,H,heart,index) {
-  const end={x:heart.x+heart.w*route.anchor[0],y:heart.y+heart.h*route.anchor[1]};
+  const end=heartPoint(heart,...route.anchor);
   const start={x:route.start[0]*W,y:route.start[1]*H};
   const bend=(hash(index*8.3)-.5)*W*.18;
+  const nx=route.normal[0]*W*.13,ny=route.normal[1]*H*.14,c=Math.cos(heart.angle),s=Math.sin(heart.angle);
   return [start,
     {x:mix(start.x,end.x,.38)+bend,y:mix(start.y,end.y,.38)-bend/1.65},
-    {x:end.x+route.normal[0]*W*.13,y:end.y+route.normal[1]*H*.14},end];
+    {x:end.x+nx*c-ny*1.65*s,y:end.y+nx*s/1.65+ny*c},end];
 }
 export function curvePoint(c,u) {
   const v=1-u;
